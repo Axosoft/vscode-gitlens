@@ -15,7 +15,7 @@ import type {
 import GraphContainer, { CommitDateTimeSources, refZone } from '@gitkraken/gitkraken-components';
 import { VSCodeCheckbox, VSCodeRadio, VSCodeRadioGroup } from '@vscode/webview-ui-toolkit/react';
 import type { FormEvent, MouseEvent, ReactElement } from 'react';
-import React, { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createElement, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getPlatform } from '@env/platform';
 import type { DateStyle } from '../../../../config';
 import type { SearchQuery } from '../../../../git/search';
@@ -39,6 +39,7 @@ import type {
 	GraphSearchResults,
 	GraphSearchResultsError,
 	InternalNotificationType,
+	OnboardingState,
 	State,
 	UpdateGraphConfigurationParams,
 	UpdateStateCallback,
@@ -75,6 +76,8 @@ import { GlSearchBox } from '../../shared/components/search/react';
 import type { SearchNavigationEventDetail } from '../../shared/components/search/search-box';
 import type { DateTimeFormat } from '../../shared/date';
 import { formatDate, fromNow } from '../../shared/date';
+import type { KeyedDriveStep } from '../../shared/onboarding';
+import { createOnboarding } from '../../shared/onboarding';
 import { GlGraphHover } from './hover/graphHover.react';
 import type { GraphMinimapDaySelectedEventDetail } from './minimap/minimap';
 import { GlGraphMinimapContainer } from './minimap/minimap-container.react';
@@ -105,6 +108,7 @@ export interface GraphWrapperProps {
 	onExcludeType?: (key: keyof GraphExcludeTypes, value: boolean) => void;
 	onIncludeOnlyRef?: (all: boolean) => void;
 	onUpdateGraphConfiguration?: (changes: UpdateGraphConfigurationParams['changes']) => void;
+	onOnboardingStateChanged?: (name: string, state: OnboardingState) => void;
 }
 
 const getGraphDateFormatter = (config?: GraphComponentConfig): OnFormatCommitDateTime => {
@@ -226,6 +230,7 @@ export function GraphWrapper({
 	onExcludeType,
 	onIncludeOnlyRef,
 	onUpdateGraphConfiguration,
+	onOnboardingStateChanged,
 }: GraphWrapperProps) {
 	const graphRef = useRef<GraphContainer>(null);
 
@@ -393,6 +398,158 @@ export function GraphWrapper({
 	}
 
 	useEffect(() => subscriber?.(updateState), []);
+
+	useLayoutEffect(() => {
+		const onboardingKey = 'graph-tour';
+		// const onboardingState = state.onboarding?.[onboardingKey];
+		// if (onboardingState?.dismissed === true) {
+		// 	return;
+		// }
+
+		const onboardingColumnKey = `${onboardingKey}-graph-column-`;
+		// columns: ref, graph, message, author, changes, datetime, sha
+		const columnSteps = [
+			{
+				key: `${onboardingColumnKey}ref`,
+				element: '#ref-zone',
+				popover: {
+					title: 'Branch / Tag Column',
+					description:
+						'See branches and tag labels, including locally and on remotes. This label indicates the commit it is on as well as associated PRs, ahead/behind status and your current branch.',
+				},
+			},
+			{
+				key: `${onboardingColumnKey}graph`,
+				element: '#commit-zone',
+				popover: {
+					title: 'Graph Column',
+					description: /* html */ `
+							Each row of the graph represents one commit, and the top is always for the latest changes.
+							<br><br>
+							An interactive WIP (Work-In-Progress) node will show if the working directory has changed since the last commit.
+						`,
+				},
+			},
+			// {
+			// 	key: `${onboardingColumnKey}message`,
+			// 	element: '#commit-message-zone',
+			// 	popover: {
+			// 		title: 'Commit Message Column',
+			// 		description: 'The commit message.',
+			// 	},
+			// },
+			// {
+			// 	key: `${onboardingColumnKey}author`,
+			// 	element: '#commit-author-zone',
+			// 	popover: {
+			// 		title: 'Author Column',
+			// 		description: 'The author of the commit.',
+			// 	},
+			// },
+			// {
+			// 	key: `${onboardingColumnKey}changes`,
+			// 	element: '#changes-zone',
+			// 	popover: {
+			// 		title: 'Changes Column',
+			// 		description: 'The number of files changed and the number of lines added/removed.',
+			// 	},
+			// },
+			// {
+			// 	key: `${onboardingColumnKey}datetime`,
+			// 	element: '#commit-date-time-zone',
+			// 	popover: {
+			// 		title: 'Date/Time',
+			// 		description: 'The date and time the commit was authored.',
+			// 	},
+			// },
+			// {
+			// 	key: `${onboardingColumnKey}sha`,
+			// 	element: '#commit-sha-zone',
+			// 	popover: {
+			// 		title: 'Column: SHA',
+			// 		description: 'The SHA of the commit.',
+			// 	},
+			// },
+		].filter(step => {
+			const columnName = step.key.replace(onboardingColumnKey, '');
+			if ((columns as GraphColumnsSettings)?.[columnName]?.isHidden === true) {
+				return false;
+			}
+			return true;
+		});
+
+		const steps: KeyedDriveStep[] = [
+			{
+				key: `${onboardingKey}-welcome`,
+				element: '#main',
+				popover: {
+					side: 'top',
+					align: 'center',
+					title: 'Welcome to the Commit Graph',
+					description:
+						'Visualize your repository commit history and get rich information about branches, commits, and collaborators all in one view.',
+				},
+			},
+			...columnSteps,
+			{
+				key: `${onboardingKey}-minimap`,
+				element: '#graph-minimap',
+				popover: {
+					title: 'Minimap',
+					description:
+						'Quickly see the activity of the repository, see the HEAD/upstream, branches (local and remote), and easily jump to them. ',
+				},
+			},
+			{
+				key: `${onboardingKey}-repo-actions`,
+				element: '#graph-repo-actions',
+				popover: {
+					title: 'Repository Actions',
+					description: "Quickly switch repos, branches, see a branch's PR info, push/pull/fetch, and more.",
+				},
+			},
+			{
+				key: `${onboardingKey}-search`,
+				element: '#graph-search',
+				popover: {
+					title: 'Rich Commit Search',
+					description:
+						'Highlight all matching results across your entire repository when searching for a commit, message, author, a changed file or files, or even a specific code change.',
+				},
+			},
+			// {
+			// 	key: `${onboardingKey}-done`,
+			// 	popover: {
+			// 		title: 'Done',
+			// 		description: "That's it for now. Enjoy! Please see this walkthrough for more information.",
+			// 	},
+			// },
+		];
+
+		const driverObj = createOnboarding(
+			steps,
+			{
+				onCloseClick: ($el, step, options) => {
+					console.log('onCloseClick', $el, step, options);
+					onOnboardingStateChanged?.(onboardingKey, { dismissed: true });
+				},
+			},
+			(key, step, options) => {
+				console.log('onHighlightedByKey', key, step, options);
+				onOnboardingStateChanged?.(onboardingKey, {
+					dismissed: false,
+					completed: key === `${onboardingKey}-done`,
+					step: key,
+				});
+			},
+		);
+
+		driverObj.drive();
+
+		return () => {
+			driverObj.destroy();
+		};
+	}, []);
 
 	const handleKeyDown = (e: KeyboardEvent) => {
 		if (e.key === 'Enter' || e.key === ' ') {
@@ -1127,7 +1284,7 @@ export function GraphWrapper({
 		<>
 			<header className="titlebar graph-app__header">
 				<div className="titlebar__row titlebar__row--wrap">
-					<div className="titlebar__group">
+					<div id="graph-repo-actions" className="titlebar__group">
 						{repo && branchState?.provider?.url && (
 							<GlTooltip placement="bottom">
 								<a
@@ -1377,6 +1534,7 @@ export function GraphWrapper({
 								<span className="action-divider"></span>
 							</span>
 							<GlSearchBox
+								id="graph-search"
 								ref={searchEl}
 								label="Search Commits"
 								step={searchPosition}
@@ -1553,6 +1711,7 @@ export function GraphWrapper({
 				</p>
 			</GlFeatureGate>
 			<GlGraphMinimapContainer
+				id="graph-minimap"
 				ref={minimap as any}
 				activeDay={activeDay}
 				disabled={!graphConfig?.minimap}
