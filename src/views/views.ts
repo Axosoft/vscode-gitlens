@@ -74,7 +74,7 @@ export class Views implements Disposable {
 	set lastSelectedScmGroupedView(type: GroupableTreeViewTypes | undefined) {
 		this._lastSelectedScmGroupedView = type;
 		void setContext('gitlens:views:scm:grouped:view', type);
-		void this.container.storage.storeWorkspace('views:scm:grouped:selected', type).catch();
+		void this.container.storage.storeWorkspace('views:scm:grouped:selected', type);
 	}
 
 	private _scmGroupedView: ScmGroupedView | undefined;
@@ -288,14 +288,15 @@ export class Views implements Disposable {
 
 			registerCommand('gitlens.views.scm.grouped.welcome.dismiss', () => {
 				this._welcomeDismissed = true;
-				void this.container.storage.store('views:scm:grouped:welcome:dismissed', true).catch();
+				void this.container.storage.store('views:scm:grouped:welcome:dismissed', true);
 				this.updateScmGroupedViewsRegistration();
 			}),
 			registerCommand('gitlens.views.scm.grouped.welcome.restore', async () => {
 				this._welcomeDismissed = true;
-				void this.container.storage.store('views:scm:grouped:welcome:dismissed', true).catch();
+				void this.container.storage.store('views:scm:grouped:welcome:dismissed', true);
 				await updateScmGroupedViewsInConfig(new Set());
 			}),
+			registerCommand('gitlens.views.switchToSeparateViews', () => this.switchToSeparateViews()),
 		];
 	}
 
@@ -834,6 +835,21 @@ export class Views implements Disposable {
 			case 'scm.grouped':
 				return void executeCoreCommand(`gitlens.views.scm.grouped.focus`);
 		}
+	}
+
+	private async switchToSeparateViews() {
+		await configuration.updateEffective('views.scm.grouped.views', {
+			commits: false,
+			branches: false,
+			remotes: false,
+			stashes: false,
+			tags: false,
+			worktrees: false,
+			contributors: false,
+			repositories: false,
+			searchAndCompare: false,
+			launchpad: false,
+		});
 	}
 }
 
