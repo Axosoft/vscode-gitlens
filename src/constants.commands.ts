@@ -681,8 +681,10 @@ type HomeWebviewCommands = `home.${
 	| 'openPullRequestOnRemote'
 	| 'createPullRequest'
 	| 'openWorktree'
+	| 'openWorktreeInNewWindow'
 	| 'switchToBranch'
 	| 'fetch'
+	| 'pull'
 	| 'openInGraph'
 	| 'createBranch'
 	| 'startWork'}`;

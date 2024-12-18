@@ -34,6 +34,7 @@ export interface State extends WebviewState {
 export interface IntegrationState extends IntegrationDescriptor {
 	connected: boolean;
 }
+export type BranchRef = { repoPath: string; branchId: string };
 
 export type OverviewRecentThreshold = 'OneDay' | 'OneWeek' | 'OneMonth';
 export type OverviewStaleThreshold = 'OneYear';
