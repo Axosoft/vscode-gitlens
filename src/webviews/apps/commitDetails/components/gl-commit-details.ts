@@ -204,6 +204,9 @@ export class GlCommitDetails extends GlDetailsBase {
 
 	private renderAutoLinks() {
 		if (this.isUncommitted) return undefined;
+		if (!this.state?.autolinksEnabled) {
+			return nothing;
+		}
 
 		const deduped = new Map<
 			string,
