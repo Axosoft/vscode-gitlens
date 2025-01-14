@@ -1239,6 +1239,7 @@ export class CommitDetailsWebviewProvider
 			preferences: current.preferences,
 			includeRichContent: current.richStateLoaded,
 			autolinkedIssues: current.autolinkedIssues?.map(serializeIssueOrPullRequest),
+			autolinksEnabled: configuration.get('views.commitDetails.autolinks.enabled') ?? false,
 			pullRequest: current.pullRequest != null ? serializePullRequest(current.pullRequest) : undefined,
 			wip: serializeWipContext(wip),
 			orgSettings: current.orgSettings,
