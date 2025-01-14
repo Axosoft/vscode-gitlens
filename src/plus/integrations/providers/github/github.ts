@@ -157,8 +157,14 @@ reviewRequests(first: 10) {
 		}
 	}
 }
-statusCheckRollup {
-	state
+commits(last: 1) {
+	nodes {
+		commit {
+			statusCheckRollup {
+				state
+			}
+		}
+	}
 }
 totalCommentsCount
 viewerCanUpdate
