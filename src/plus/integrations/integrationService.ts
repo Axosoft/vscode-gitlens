@@ -450,7 +450,9 @@ export class IntegrationService implements Disposable {
 		return key == null ? this._connectedCache.size !== 0 : this._connectedCache.has(key);
 	}
 
-	get(id: SupportedHostingIntegrationIds): Promise<HostingIntegration>;
+	get(
+		id: SupportedHostingIntegrationIds | SelfHostedIntegrationId.CloudGitHubEnterprise,
+	): Promise<HostingIntegration>;
 	get(id: SupportedIssueIntegrationIds): Promise<IssueIntegration>;
 	get(id: SupportedSelfHostedIntegrationIds, domain: string): Promise<HostingIntegration>;
 	get(id: SupportedIntegrationIds, domain?: string): Promise<Integration>;
@@ -737,8 +739,10 @@ export class IntegrationService implements Disposable {
 	@log<IntegrationService['getMyCurrentAccounts']>({
 		args: { 0: integrationIds => (integrationIds?.length ? integrationIds.join(',') : '<undefined>') },
 	})
-	async getMyCurrentAccounts(integrationIds: HostingIntegrationId[]): Promise<Map<HostingIntegrationId, Account>> {
-		const accounts = new Map<HostingIntegrationId, Account>();
+	async getMyCurrentAccounts(
+		integrationIds: (HostingIntegrationId | SelfHostedIntegrationId.CloudGitHubEnterprise)[],
+	): Promise<Map<HostingIntegrationId | SelfHostedIntegrationId.CloudGitHubEnterprise, Account>> {
+		const accounts = new Map<HostingIntegrationId | SelfHostedIntegrationId.CloudGitHubEnterprise, Account>();
 		await Promise.allSettled(
 			integrationIds.map(async integrationId => {
 				const integration = await this.get(integrationId);
@@ -757,7 +761,7 @@ export class IntegrationService implements Disposable {
 		args: { 0: integrationIds => (integrationIds?.length ? integrationIds.join(',') : '<undefined>'), 1: false },
 	})
 	async getMyPullRequests(
-		integrationIds?: HostingIntegrationId[],
+		integrationIds?: (HostingIntegrationId | SelfHostedIntegrationId.CloudGitHubEnterprise)[],
 		cancellation?: CancellationToken,
 		silent?: boolean,
 	): Promise<IntegrationResult<SearchedPullRequest[] | undefined>> {
