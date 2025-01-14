@@ -16,7 +16,7 @@ import GraphContainer, { CommitDateTimeSources, refZone } from '@gitkraken/gitkr
 import type { SlChangeEvent } from '@shoelace-style/shoelace';
 import SlOption from '@shoelace-style/shoelace/dist/react/option/index.js';
 import SlSelect from '@shoelace-style/shoelace/dist/react/select/index.js';
-import type { FormEvent, MouseEvent, ReactElement } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
 import React, { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatform } from '@env/platform';
 import type { ConnectCloudIntegrationsCommandArgs } from '../../../../commands/cloudIntegrations';
@@ -133,7 +133,7 @@ const getGraphDateFormatter = (config?: GraphComponentConfig): OnFormatCommitDat
 		formatCommitDateTime(commitDateTime, config?.dateStyle, config?.dateFormat, source);
 };
 
-const createIconElements = (): Record<string, ReactElement> => {
+const createIconElements = () => {
 	const iconList = [
 		'head',
 		'remote',
@@ -173,7 +173,7 @@ const createIconElements = (): Record<string, ReactElement> => {
 
 	const miniIconList = ['upstream-ahead', 'upstream-behind'];
 
-	const elementLibrary: Record<string, ReactElement> = {};
+	const elementLibrary: Record<string, any> = {};
 	iconList.forEach(iconKey => {
 		elementLibrary[iconKey] = createElement('span', { className: `graph-icon icon--${iconKey}` });
 	});
@@ -191,6 +191,7 @@ const createIconElements = (): Record<string, ReactElement> => {
 const iconElementLibrary = createIconElements();
 
 const getIconElementLibrary = (iconKey: string) => {
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 	return iconElementLibrary[iconKey];
 };
 
