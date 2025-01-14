@@ -3,14 +3,17 @@ import { authentication, EventEmitter, window } from 'vscode';
 import { wrapForForcedInsecureSSL } from '@env/fetch';
 import type { IntegrationId } from '../../../constants.integrations';
 import { HostingIntegrationId, IssueIntegrationId, SelfHostedIntegrationId } from '../../../constants.integrations';
-import type { IntegrationAuthenticationKeys } from '../../../constants.storage';
+import type {
+	IntegrationAuthenticationKeys,
+	StoredConfiguredProviderAuthenticationDescriptor,
+} from '../../../constants.storage';
 import type { Sources } from '../../../constants.telemetry';
 import type { Container } from '../../../container';
 import { gate } from '../../../system/decorators/gate';
 import { debug, log } from '../../../system/decorators/log';
 import type { DeferredEventExecutor } from '../../../system/event';
-import { supportedIntegrationIds } from '../providers/models';
-import type { ProviderAuthenticationSession } from './models';
+import { isSelfHostedIntegrationId, supportedIntegrationIds } from '../providers/models';
+import type { ConfiguredProviderAuthenticationDescriptor, ProviderAuthenticationSession } from './models';
 import { isSupportedCloudIntegrationId } from './models';
 
 const maxSmallIntegerV8 = 2 ** 30 - 1; // Max number that can be stored in V8's smis (small integers)
@@ -96,6 +99,10 @@ abstract class IntegrationAuthenticationProviderBase<ID extends IntegrationId = 
 
 	protected async deleteSecret(key: IntegrationAuthenticationKeys) {
 		await this.container.storage.deleteSecret(key);
+		await this.container.authenticationService.removeConfigured({
+			integrationId: this.authProviderId,
+			domain: isSelfHostedIntegrationId(this.authProviderId) ? key : undefined,
+		});
 	}
 
 	protected async writeSecret(
@@ -103,6 +110,13 @@ abstract class IntegrationAuthenticationProviderBase<ID extends IntegrationId = 
 		session: ProviderAuthenticationSession | StoredSession,
 	) {
 		await this.container.storage.storeSecret(key, JSON.stringify(session));
+		await this.container.authenticationService.addConfigured({
+			integrationId: this.authProviderId,
+			domain: isSelfHostedIntegrationId(this.authProviderId) ? session.id : undefined,
+			expiresAt: session.expiresAt,
+			scopes: session.scopes.join(','),
+			cloud: session.cloud ?? false,
+		});
 	}
 
 	protected async readSecret(key: IntegrationAuthenticationKeys): Promise<StoredSession | undefined> {
@@ -468,12 +482,72 @@ class BuiltInAuthenticationProvider extends LocalIntegrationAuthenticationProvid
 
 export class IntegrationAuthenticationService implements Disposable {
 	private readonly providers = new Map<IntegrationId, IntegrationAuthenticationProvider>();
+	private _configured?: Map<IntegrationId, ConfiguredProviderAuthenticationDescriptor[]>;
 
 	constructor(private readonly container: Container) {}
 
 	dispose() {
 		this.providers.forEach(p => void p.dispose());
 		this.providers.clear();
+	}
+
+	get configured(): Map<IntegrationId, ConfiguredProviderAuthenticationDescriptor[]> {
+		if (this._configured == null) {
+			this._configured = new Map();
+			const storedConfigured = this.container.storage.get('integrations:configured');
+			for (const [id, configured] of Object.entries(storedConfigured ?? {})) {
+				if (configured == null) continue;
+				const descriptors = configured.map(d => ({
+					...d,
+					expiresAt: d.expiresAt ? new Date(d.expiresAt) : undefined,
+				}));
+				this._configured.set(id as IntegrationId, descriptors);
+			}
+		}
+
+		return this._configured;
+	}
+
+	private async storeConfigured() {
+		// We need to convert the map to a record to store
+		const configured: Record<string, StoredConfiguredProviderAuthenticationDescriptor[]> = {};
+		for (const [id, descriptors] of this.configured) {
+			configured[id] = descriptors.map(d => ({
+				...d,
+				expiresAt: d.expiresAt
+					? d.expiresAt instanceof Date
+						? d.expiresAt.toISOString()
+						: d.expiresAt
+					: undefined,
+			}));
+		}
+
+		await this.container.storage.store('integrations:configured', configured);
+	}
+
+	async addConfigured(descriptor: ConfiguredProviderAuthenticationDescriptor) {
+		const descriptors = this.configured.get(descriptor.integrationId) ?? [];
+		// Only add if one does not exist
+		if (descriptors.some(d => d.domain === descriptor.domain && d.integrationId === descriptor.integrationId)) {
+			return;
+		}
+		descriptors.push(descriptor);
+		this.configured.set(descriptor.integrationId, descriptors);
+		await this.storeConfigured();
+	}
+
+	async removeConfigured(descriptor: Pick<ConfiguredProviderAuthenticationDescriptor, 'integrationId' | 'domain'>) {
+		const descriptors = this.configured.get(descriptor.integrationId);
+		if (descriptors == null) return;
+		const index = descriptors.findIndex(
+			d => d.domain === descriptor.domain && d.integrationId === descriptor.integrationId,
+		);
+		if (index === -1) return;
+
+		descriptors.splice(index, 1);
+		this.configured.set(descriptor.integrationId, descriptors);
+
+		await this.storeConfigured();
 	}
 
 	async get(providerId: IntegrationId): Promise<IntegrationAuthenticationProvider> {

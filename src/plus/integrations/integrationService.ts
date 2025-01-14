@@ -475,8 +475,28 @@ export class IntegrationService implements Disposable {
 							// return immediately in order to not to cache it after the "switch" block:
 							return integration;
 						}
+
+						const existingConfigured = this.authenticationService.configured?.get(
+							SelfHostedIntegrationId.CloudGitHubEnterprise,
+						);
+						if (existingConfigured?.length) {
+							const { domain } = existingConfigured[0];
+							if (domain == null) throw new Error(`Domain is required for '${id}' integration`);
+							integration = new (
+								await import(/* webpackChunkName: "integrations" */ './providers/github')
+							).GitHubEnterpriseIntegration(
+								this.container,
+								this.authenticationService,
+								this.getProvidersApi.bind(this),
+								domain,
+								id,
+							);
+							break;
+						}
+
 						throw new Error(`Domain is required for '${id}' integration`);
 					}
+
 					integration = new (
 						await import(/* webpackChunkName: "integrations" */ './providers/github')
 					).GitHubEnterpriseIntegration(
